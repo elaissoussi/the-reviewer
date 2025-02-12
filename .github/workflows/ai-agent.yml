@@ -50,6 +50,9 @@ jobs:
             },
             "blocking": true
           }'
+          timeout: 60000  # Increased timeout to 30 seconds
+          retries: 3      # Added retries
+          log-response: true  # Added logging for debugging
 
       - name: Review with Dust
         uses: actions/github-script@v7
