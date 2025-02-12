@@ -23,28 +23,40 @@ jobs:
           # Encode diff content to base64 to avoid formatting issues
           echo "diff=$(git diff ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | base64 -w 0)" >> $GITHUB_OUTPUT
 
-      - name: Review with Dust
-        uses: actions/github-script@v7
+      - name: Get Dust Analysis
+        id: dust-analysis
+        uses: indiesdev/curl@v1.1
         env:
           DUST_API_KEY: ${{ secrets.DUST_API_KEY }}
-          DUST_WORKSPACE: ${{ secrets.DUST_WORKSPACE }}
+        with:
+          url: 'https://dust.tt/api/v1/w/5494230b3c/assistant/conversations'
+          method: 'POST'
+          headers: '{
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": "Bearer ${{ env.DUST_API_KEY }}"
+          }'
+          body: '{
+            "message": {
+              "content": "Review this PR diff: ${{ steps.changes.outputs.diff }}",
+              "mentions": [{"configurationId": "PaI6fFlAyA"}],
+              "context": {
+                "username": "${{ github.actor }}",
+                "timezone": "UTC",
+                "fullName": "${{ github.actor }}",
+                "email": "${{ github.actor }}@users.noreply.github.com",
+                "origin": "github-action"
+              }
+            },
+            "blocking": true
+          }'
+
+      - name: Review with Dust
+        uses: actions/github-script@v7
         with:
           script: |
-            const diff = Buffer.from(process.env.diff, 'base64').toString();
-            const response = await fetch('https://dust.tt/api/v1/workspaces/${DUST_WORKSPACE}/assistant/review', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${process.env.DUST_API_KEY}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                diff: diff,
-                title: context.payload.pull_request.title,
-                description: context.payload.pull_request.body
-              })
-            });
-            
-            const review = await response.json();
+            const dustResponse = ${{ steps.dust-analysis.outputs.response }};
+            const review = dustResponse.conversation.content[1][0].content;
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -52,8 +64,8 @@ jobs:
               issue_number: context.issue.number,
               body: `## Dust PR Review :mag:
 
-              ${review.comments.join('\n\n')}
-              
+              ${review}
+            
               ### Review Checklist :clipboard:
               - [ ] Code formatting and style :art:
               - [ ] Documentation updates :memo:
