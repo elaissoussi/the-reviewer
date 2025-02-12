@@ -57,9 +57,9 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const dustResponse = JSON.parse(${{ steps.dust-analysis.outputs.response }});
-            const review = dustResponse.data.conversation.content[1][0].content;
-            const title = dustResponse.data.conversation.title;
+            const response = ${{ steps.dust-analysis.outputs.response }};
+            const review = response.data.conversation.content[1][0].content;
+            const title = response.data.conversation.title;
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
