@@ -1,0 +1,62 @@
+name: Dust PR Review
+
+on:
+  pull_request:
+    types: [ opened, synchronize ]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          git diff ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} > pr_diff.txt
+          echo "diff=$(cat pr_diff.txt)" >> $GITHUB_OUTPUT
+
+      - name: Review with Dust
+        uses: actions/github-script@v7
+        env:
+          DUST_API_KEY: ${{ secrets.DUST_API_KEY }}
+          DUST_WORKSPACE: ${{ secrets.DUST_WORKSPACE }}
+        with:
+          script: |
+            const response = await fetch('https://dust.tt/api/v1/workspaces/${DUST_WORKSPACE}/assistant/review', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.DUST_API_KEY}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                diff: process.env.diff,
+                title: context.payload.pull_request.title,
+                description: context.payload.pull_request.body
+              })
+            });
+            
+            const review = await response.json();
+            
+            // Post review comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## Dust PR Review :mag:
+
+              ${review.comments.join('\n\n')}
+            
+              ### Review Checklist :clipboard:
+              - [ ] Code formatting and style :art:
+              - [ ] Documentation updates :memo:
+              - [ ] Test coverage :test_tube:
+              - [ ] Security considerations :lock:`
+            });
