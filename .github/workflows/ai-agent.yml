@@ -59,7 +59,7 @@ jobs:
         with:
           script: |
             const dustResponse = ${{ steps.dust-analysis.outputs.response }};
-            const review = dustResponse.conversation.content[1][0].content;
+            const review = dustResponse.conversation.content;
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
